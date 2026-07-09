@@ -2,7 +2,7 @@
 
 A working diagnostic tool for AI deployment strategy: scope and prioritize a use case, score organizational readiness, generate a phased rollout plan, and model an adoption outlook, all in one pass.
 
-**[Try it live →](#)** *(update this link once hosted via GitHub Pages)*
+**[Try it live →](https://kirtibysani-star.github.io/ai-deployment-lifecycle-instrument.html)**
 
 ---
 
