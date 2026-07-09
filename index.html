@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Deployment Lifecycle Instrument</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  :root{
+    --bg:#F8F4EC; --panel:#FFFDF8; --ink:#2B2620; --ink-soft:#6B6255;
+    --sienna:#C1613B; --sienna-soft:#E8C9B9; --sage:#6B7A5E; --sage-soft:#DCE3D3;
+    --gold:#C9A227; --gold-soft:#EFE3B8; --rust:#A13D2B; --rust-soft:#E8CFC5; --line:#E4DBCA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; padding:40px 24px 96px;}
+  .wrap{max-width:1080px; margin:0 auto;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--sienna); margin-bottom:10px;}
+  h1{font-family:'Fraunces',serif; font-weight:600; font-size:clamp(26px,4vw,38px); line-height:1.1; margin:0 0 12px;}
+  .sub{color:var(--ink-soft); max-width:640px; line-height:1.55; margin-bottom:28px; font-size:14.5px;}
+
+  .stepper{display:flex; gap:0; margin-bottom:28px; border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--panel);}
+  .step-btn{
+    flex:1; padding:14px 10px; text-align:center; cursor:pointer; background:transparent; border:none;
+    border-right:1px solid var(--line); font-family:'IBM Plex Mono',monospace; font-size:11.5px;
+    letter-spacing:.04em; color:var(--ink-soft); position:relative;
+  }
+  .step-btn:last-child{border-right:none;}
+  .step-btn .num{display:block; font-size:10px; color:var(--sienna); margin-bottom:3px;}
+  .step-btn.active{background:var(--sienna); color:#fff;}
+  .step-btn.active .num{color:#F8DFCF;}
+  .step-btn.done:not(.active)::after{content:'✓'; color:var(--sage); margin-left:5px;}
+  .step-btn:disabled{opacity:.4; cursor:not-allowed;}
+
+  .stage{display:none;}
+  .stage.active{display:block;}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:26px;}
+  .layout{display:grid; grid-template-columns:1.15fr 1fr; gap:24px;}
+  @media(max-width:860px){.layout{grid-template-columns:1fr;}}
+
+  label.field{display:block; font-family:'IBM Plex Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin:16px 0 6px;}
+  label.field:first-child{margin-top:0;}
+  textarea,input[type=text]{
+    width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:3px; background:#fff; color:var(--ink); resize:vertical;
+  }
+  textarea{min-height:64px;}
+
+  .dim{margin-bottom:24px;} .dim:last-child{margin-bottom:0;}
+  .dim-label{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:8px; display:flex; justify-content:space-between;}
+  .dim-label b{color:var(--ink); font-weight:600;}
+  .q{font-size:14px; margin-bottom:8px; line-height:1.4;}
+  .opts{display:flex; flex-direction:column; gap:6px; margin-bottom:12px;}
+  .opts:last-child{margin-bottom:0;}
+  label.opt{display:flex; gap:9px; align-items:flex-start; font-size:13px; line-height:1.4; padding:7px 9px; border-radius:3px; cursor:pointer; border:1px solid transparent; color:var(--ink-soft);}
+  label.opt:hover{background:#FBF7EF;}
+  label.opt input{margin-top:2px; accent-color:var(--sienna);}
+  label.opt.checked{background:var(--sienna-soft); color:var(--ink); border-color:var(--sienna);}
+
+  .radar-card{position:sticky; top:24px; align-self:start;}
+  .radar-title{font-family:'Fraunces',serif; font-size:18px; font-weight:600; margin:0 0 4px;}
+  .radar-note{font-size:12px; color:var(--ink-soft); margin-bottom:16px;}
+  svg{display:block; margin:0 auto;}
+  .score-row{display:flex; align-items:baseline; gap:9px; justify-content:center; margin-top:6px;}
+  .score-num{font-family:'Fraunces',serif; font-size:40px; font-weight:600;}
+  .score-max{font-family:'IBM Plex Mono',monospace; color:var(--ink-soft); font-size:13px;}
+  .band-wrap{text-align:center;}
+  .band{text-align:center; margin-top:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; border-radius:3px; display:inline-block;}
+  .band.foundation{background:var(--rust-soft); color:var(--rust);}
+  .band.pilot{background:var(--gold-soft); color:#8A6D14;}
+  .band.fasttrack{background:var(--sage-soft); color:var(--sage);}
+
+  .flags{margin-top:18px; border-top:1px solid var(--line); padding-top:14px;}
+  .flags-title,.plan-title,.dash-title{font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:10px;}
+  .flag{font-size:12.5px; line-height:1.5; padding:9px 11px; border-left:3px solid var(--rust); background:var(--rust-soft); border-radius:0 3px 3px 0; margin-bottom:8px; color:var(--ink);}
+  .flag.none{border-color:var(--sage); background:var(--sage-soft);}
+
+  .phase{display:flex; gap:12px; margin-bottom:16px;} .phase:last-child{margin-bottom:0;}
+  .phase-mark{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--sienna); border:1px solid var(--sienna); border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .phase-body b{font-size:13.5px;} .phase-body p{margin:3px 0 0; font-size:12.5px; color:var(--ink-soft); line-height:1.5;}
+  .phase-body .exit-criteria{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); color:var(--ink);}
+  .phase-body .exit-criteria b{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--sienna); display:block; margin-bottom:2px;}
+
+  .toolbar{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;}
+  button.mock{font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--ink); color:var(--bg); border:none; padding:10px 16px; border-radius:3px; cursor:pointer;}
+  button.mock:hover{background:#4A4237;}
+  button.reset{font-family:'IBM Plex Mono',monospace; font-size:12px; background:transparent; color:var(--ink-soft); border:1px solid var(--line); padding:10px 16px; border-radius:3px; cursor:pointer;}
+  button.reset:hover{border-color:var(--ink-soft); color:var(--ink);}
+  button.next{font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--sienna); color:#fff; border:none; padding:11px 18px; border-radius:3px; cursor:pointer; margin-top:20px;}
+  button.next:hover{background:#A6512F;}
+
+  .scenario-banner{display:none; background:var(--panel); border:1px dashed var(--sienna); border-radius:4px; padding:16px 18px; margin-bottom:22px; font-size:13px; line-height:1.55;}
+  .scenario-banner.show{display:block;}
+  .scenario-banner b{color:var(--sienna);}
+
+  .brief-card{background:#FBF7EF; border:1px solid var(--line); border-radius:4px; padding:16px 18px; margin-bottom:20px; font-size:13px; line-height:1.6;}
+  .brief-card b{display:block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--sienna); margin-bottom:4px;}
+  .empty{color:var(--ink-soft); font-size:13.5px; padding:30px 10px; text-align:center; font-style:italic;}
+
+  .kpi-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px;}
+  .kpi{background:#FBF7EF; border:1px solid var(--line); border-radius:4px; padding:16px; text-align:center;}
+  .kpi .val{font-family:'Fraunces',serif; font-size:26px; font-weight:600;}
+  .kpi .lab{font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); margin-top:4px;}
+  .health.good{color:var(--sage);} .health.warn{color:var(--gold);} .health.bad{color:var(--rust);}
+
+  .callout{border-left:3px solid var(--sienna); background:var(--sienna-soft); padding:12px 14px; border-radius:0 3px 3px 0; font-size:13px; line-height:1.55; margin-top:18px;}
+
+  .model-badge{
+    display:flex; align-items:center; gap:8px; background:var(--gold-soft); border:1px solid var(--gold);
+    color:#7A5F0F; border-radius:3px; padding:9px 13px; font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px; letter-spacing:.02em; margin-bottom:18px;
+  }
+  .model-badge b{text-transform:uppercase; letter-spacing:.06em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Deployment Strategy / Diagnostic Instrument</div>
+  <h1>AI Deployment Lifecycle Instrument</h1>
+  <p class="sub">A single working instrument across four stages of a real deployment: capture and prioritize the use case, diagnose readiness, generate a phased plan, and model an adoption outlook after launch.</p>
+
+  <div class="toolbar">
+    <button class="mock" onclick="loadMock()">Load mock scenario: Larkspur Group</button>
+    <button class="reset" onclick="resetAll()">Reset</button>
+  </div>
+  <div class="scenario-banner" id="scenarioBanner"></div>
+
+  <div class="stepper" id="stepper"></div>
+
+  <!-- STAGE 1: DISCOVERY -->
+  <div class="stage" id="stage-discovery">
+    <div class="panel">
+      <label class="field">Use case name</label>
+      <input type="text" id="d-name" oninput="onDiscoveryChange()"/>
+      <label class="field">Problem statement — what's slow, costly, or inconsistent today</label>
+      <textarea id="d-problem" oninput="onDiscoveryChange()"></textarea>
+      <label class="field">Current process — how is this handled today, and by whom</label>
+      <textarea id="d-process" oninput="onDiscoveryChange()"></textarea>
+      <label class="field">Target metric — the one number that proves this worked</label>
+      <input type="text" id="d-metric" oninput="onDiscoveryChange()"/>
+
+      <div style="border-top:1px solid var(--line); margin-top:22px; padding-top:18px;">
+        <label class="field" style="margin-top:0;">Intended scope</label>
+        <div id="scopeQuestion" class="opts"></div>
+      </div>
+
+      <div style="border-top:1px solid var(--line); margin-top:8px; padding-top:18px;">
+        <div class="plan-title">Priority screen (ICE)</div>
+        <div id="iceQuestions"></div>
+        <div id="icePriorityBox" style="margin-top:14px;"></div>
+      </div>
+
+      <button class="next" onclick="goTo('readiness')">Continue to Readiness →</button>
+    </div>
+  </div>
+
+  <!-- STAGE 2: READINESS -->
+  <div class="stage" id="stage-readiness">
+    <div id="briefBox"></div>
+    <div class="layout">
+      <div class="panel" id="questions"></div>
+      <div class="panel radar-card">
+        <div class="radar-title">Readiness Profile</div>
+        <div class="radar-note">Live as you answer</div>
+        <svg id="radar" width="280" height="280" viewBox="0 0 280 280"></svg>
+        <div class="band-wrap">
+          <div class="score-row"><span class="score-num" id="overallScore">–</span><span class="score-max">/ 5.0</span></div>
+          <div class="band" id="bandLabel">Awaiting input</div>
+        </div>
+        <div class="flags">
+          <div class="flags-title">Binding constraint check</div>
+          <div id="flagBox"></div>
+        </div>
+        <button class="next" onclick="goTo('plan')" style="width:100%">See Rollout Plan →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAGE 3: PLAN -->
+  <div class="stage" id="stage-plan">
+    <div id="briefBox2"></div>
+    <div class="panel">
+      <div class="plan-title">Recommended phasing</div>
+      <div id="planBox"></div>
+      <button class="next" onclick="goTo('adoption')">Simulate Post-Launch Adoption →</button>
+    </div>
+  </div>
+
+  <!-- STAGE 4: ADOPTION -->
+  <div class="stage" id="stage-adoption">
+    <div class="panel">
+      <div class="dash-title">Modeled adoption outlook</div>
+      <div id="adoptionBody"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const scopeOptions = [
+  ['team', 'A single team'],
+  ['department', 'A department'],
+  ['orgwide', 'Org-wide']
+];
+
+const iceQs = [
+  { key:'impact', label:'Impact', q:'How much time or cost does this consume today?', opts:[['High — a major recurring drag on the team',5],['Moderate — noticeable but not the top pain point',3],['Low — a minor inconvenience',1]] },
+  { key:'confidence', label:'Confidence', q:'How proven is this pattern, internally or in the market?', opts:[['Proven elsewhere, low uncertainty this will work',5],['Some precedent, reasonable bet',3],['Novel, no real precedent to point to',1]] },
+  { key:'ease', label:'Ease', q:'How much rework would launching this require?', opts:[['Minimal — mostly configuration',5],['Moderate — real but contained build effort',3],['Significant — touches multiple systems or teams',1]] }
+];
+
+// When two dimensions tie on score, this breaks the tie by how hard each is to fix rather than
+// by array order. Sponsorship and Change Appetite rank first because Prosci's research places
+// them as the top predictors of deployment success or failure; Risk Tolerance is a genuine
+// policy-level cap next; Data, Process, and Tech are ranked last because they're the three
+// dimensions this tool treats as correctable within an engagement (see Rollout Plan mitigations).
+const tieBreakPriority = { sponsor:1, change:2, risk:3, data:4, process:5, tech:6 };
+function sortWeak(list){
+  return list.sort((a,b) => (a.score - b.score) || (tieBreakPriority[a.key] - tieBreakPriority[b.key]));
+}
+
+const dims = [
+  { key:'data', label:'Data Readiness', qs:[
+    {q:'How accessible is the data the use case depends on?', opts:[['Centralized, clean, already queried regularly',5],['Exists but scattered across 2–3 systems',3],['Fragmented, inconsistent, mostly manual',1]]},
+    {q:'Who owns data quality for this domain today?', opts:[['A clear owner with an existing governance process',5],['Someone owns it informally, no formal process',3],['No clear owner',1]]}
+  ]},
+  { key:'process', label:'Process Fit', qs:[
+    {q:'How well-defined is the workflow the AI would sit inside?', opts:[['Documented, consistent, few exceptions',5],['Understood but varies by team or person',3],['Ad hoc, changes constantly',1]]},
+    {q:'How much judgment does the current process require at each step?', opts:[['Mostly rules-based, low ambiguity',5],['Mixed, some steps need judgment calls',3],['Heavily judgment-driven throughout',1]]}
+  ]},
+  { key:'sponsor', label:'Executive Sponsorship', qs:[
+    {q:'Is there a named executive accountable for this rollout?', opts:[['Yes, with budget and authority to remove blockers',5],['Yes, but limited authority or bandwidth',3],['No single owner yet',1]]},
+    {q:'How was this initiative funded?', opts:[['Dedicated budget line tied to a business outcome',5],['Borrowed from an adjacent budget',3],['Unfunded, running on goodwill',1]]}
+  ]},
+  { key:'change', label:'Change Appetite', qs:[
+    {q:'How did the last new tool rollout land with this team?', opts:[['Adopted well, people asked for more',5],['Mixed, some pushback but it stuck',3],['Fatigue or quiet resistance to new tools',1]]},
+    {q:'How would frontline staff describe this initiative today?', opts:[['Something that helps them, they were consulted',5],['Aware of it, neutral',3],['Something being done to them',1]]}
+  ]},
+  { key:'tech', label:'Tech Stack Maturity', qs:[
+    {q:'How complex is integration with existing systems?', opts:[['Clean APIs, modern stack, low lift',5],['Workable but needs middleware or workarounds',3],['Legacy systems, heavy custom integration',1]]},
+    {q:'Is there existing infrastructure for monitoring model behavior in production?', opts:[['Yes, logging and eval tooling in place',5],['Basic logging, no formal eval process',3],['None yet',1]]}
+  ]},
+  { key:'risk', label:'Risk Tolerance', qs:[
+    {q:'What happens if the AI gets an output wrong in front of a customer or regulator?', opts:[['Low stakes, easily caught and corrected',5],['Moderate, reputational but recoverable',3],['High stakes, compliance or safety exposure',1]]},
+    {q:'How mature is the org\'s appetite for piloting unproven tools?', opts:[['Comfortable moving fast and iterating publicly',5],['Wants a contained pilot before wider exposure',3],['Highly risk-averse, needs certainty upfront',1]]}
+  ]}
+];
+
+const mock = {
+  discovery:{
+    name:'AI-assisted proposal drafting',
+    problem:'Senior consultants spend 6-8 hours per proposal reassembling boilerplate, past case studies, and pricing tables by hand, which delays turnaround on time-sensitive RFPs.',
+    process:'A practice lead drafts from scratch or copies a past proposal, routes it for partner review, and manually updates pricing. No shared template library.',
+    metric:'Cut average proposal turnaround from 6 days to 2 days without a drop in win rate.',
+    scope:'department'
+  },
+  ice:{ impact:5, confidence:3, ease:3 },
+  answers:{ data:[3,3], process:[3,3], sponsor:[5,5], change:[1,1], tech:[3,3], risk:[3,5] }
+};
+
+let state = { discovery:{name:'',problem:'',process:'',metric:'',scope:null}, ice:{impact:null,confidence:null,ease:null}, answers:{} };
+dims.forEach(d => state.answers[d.key] = [null,null]);
+
+const stages = ['discovery','readiness','plan','adoption'];
+let current = 'discovery';
+
+function renderStepper(){
+  const box = document.getElementById('stepper');
+  const names = {discovery:'Discovery', readiness:'Readiness', plan:'Rollout Plan', adoption:'Adoption Outlook'};
+  box.innerHTML = '';
+  stages.forEach((s,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'step-btn' + (s===current?' active':'') + (isDone(s)?' done':'');
+    btn.innerHTML = `<span class="num">STAGE 0${i+1}</span>${names[s]}`;
+    btn.onclick = () => goTo(s);
+    box.appendChild(btn);
+  });
+}
+function isDone(s){
+  if(s==='discovery') return !!state.discovery.name;
+  if(s==='readiness') return dims.every(d => state.answers[d.key][0]!==null && state.answers[d.key][1]!==null);
+  if(s==='plan') return isDone('readiness');
+  return false;
+}
+function goTo(s){
+  current = s;
+  stages.forEach(st => document.getElementById('stage-'+st).classList.toggle('active', st===s));
+  renderStepper();
+  if(s==='readiness'){ renderQuestions(); drawRadar(); computeOutputs(); renderBrief('briefBox'); }
+  if(s==='plan'){ computeOutputs(); renderBrief('briefBox2'); }
+  if(s==='adoption'){ renderAdoption(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function onDiscoveryChange(){
+  state.discovery.name = document.getElementById('d-name').value;
+  state.discovery.problem = document.getElementById('d-problem').value;
+  state.discovery.process = document.getElementById('d-process').value;
+  state.discovery.metric = document.getElementById('d-metric').value;
+}
+function fillDiscoveryFields(){
+  document.getElementById('d-name').value = state.discovery.name;
+  document.getElementById('d-problem').value = state.discovery.problem;
+  document.getElementById('d-process').value = state.discovery.process;
+  document.getElementById('d-metric').value = state.discovery.metric;
+  renderScope();
+  renderICE();
+}
+
+function renderScope(){
+  const box = document.getElementById('scopeQuestion');
+  box.innerHTML = '';
+  scopeOptions.forEach(([val,text]) => {
+    const checked = state.discovery.scope === val;
+    const lab = document.createElement('label');
+    lab.className = 'opt' + (checked?' checked':'');
+    lab.innerHTML = `<input type="radio" name="scope" ${checked?'checked':''}/> <span>${text}</span>`;
+    lab.querySelector('input').addEventListener('change', () => {
+      state.discovery.scope = val;
+      renderScope();
+    });
+    box.appendChild(lab);
+  });
+}
+
+function renderICE(){
+  const box = document.getElementById('iceQuestions');
+  box.innerHTML = '';
+  iceQs.forEach(item => {
+    const qDiv = document.createElement('div');
+    qDiv.className = 'dim';
+    qDiv.innerHTML = `<div class="dim-label"><span>${item.label}</span><b>${state.ice[item.key]!==null ? state.ice[item.key] : '—'}</b></div><div class="q">${item.q}</div>`;
+    const optsDiv = document.createElement('div');
+    optsDiv.className = 'opts';
+    item.opts.forEach(([text,val]) => {
+      const checked = state.ice[item.key] === val;
+      const lab = document.createElement('label');
+      lab.className = 'opt' + (checked?' checked':'');
+      lab.innerHTML = `<input type="radio" name="ice-${item.key}" ${checked?'checked':''}/> <span>${text}</span>`;
+      lab.querySelector('input').addEventListener('change', () => {
+        state.ice[item.key] = val;
+        renderICE();
+      });
+      optsDiv.appendChild(lab);
+    });
+    qDiv.appendChild(optsDiv);
+    box.appendChild(qDiv);
+  });
+  renderIcePriority();
+}
+
+function getIceBand(){
+  const vals = [state.ice.impact, state.ice.confidence, state.ice.ease];
+  if(vals.some(v=>v===null)) return null;
+  const score = vals.reduce((a,b)=>a+b,0)/3;
+  let band, cls, note;
+  if(score >= 4){ band='Strong candidate'; cls='fasttrack'; note='High impact, credible bet, and cheap enough to prove out. Worth taking through Readiness now.'; }
+  else if(score >= 2.5){ band='Worth piloting, scope carefully'; cls='pilot'; note='Not an obvious no, but at least one of impact, confidence, or ease is soft. Readiness will tell you whether the org side compensates for that.'; }
+  else { band='Reconsider scope before proceeding'; cls='foundation'; note='Low score across impact, confidence, or ease usually means the juice isn\'t worth the squeeze yet, independent of how ready the org is. Narrow the use case before spending diagnostic time on it. This will also carry forward as a caution in your rollout plan.'; }
+  return {score, band, cls, note};
+}
+
+function renderIcePriority(){
+  const el = document.getElementById('icePriorityBox');
+  const ice = getIceBand();
+  if(!ice){
+    el.innerHTML = '<div class="empty" style="padding:14px 0;">Answer all three to see a priority score.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="score-row" style="justify-content:flex-start;"><span class="score-num" style="font-size:28px;">${ice.score.toFixed(1)}</span><span class="score-max">/ 5.0 ICE score</span></div>
+    <div class="band ${ice.cls}" style="margin-top:4px;">${ice.band}</div>
+    <p style="font-size:12.5px; color:var(--ink-soft); line-height:1.5; margin:10px 0 0;">${ice.note}</p>`;
+}
+
+function renderBrief(elId){
+  const el = document.getElementById(elId);
+  if(!state.discovery.name){ el.innerHTML=''; return; }
+  const ice = getIceBand();
+  const scopeLabels = {team:'Single team', department:'Department', orgwide:'Org-wide'};
+  const scopeText = state.discovery.scope ? scopeLabels[state.discovery.scope] : 'Scope not set';
+  const iceColor = ice ? (ice.cls==='foundation' ? 'var(--rust)' : ice.cls==='fasttrack' ? 'var(--sage)' : '#8A6D14') : 'var(--ink-soft)';
+  const iceLine = ice ? `<br><span style="color:${iceColor};">${ice.band}</span> (ICE ${ice.score.toFixed(1)}/5) · ${scopeText}` : `<br>${scopeText}`;
+  el.innerHTML = `<div class="brief-card"><b>Use case brief</b>${state.discovery.name}, target: ${state.discovery.metric || 'not yet defined'}${iceLine}</div>`;
+}
+
+function renderQuestions(){
+  const box = document.getElementById('questions');
+  box.innerHTML = '';
+  dims.forEach(d => {
+    const scoreNow = dimScore(d.key);
+    const dimDiv = document.createElement('div');
+    dimDiv.className = 'dim';
+    dimDiv.innerHTML = `<div class="dim-label"><span>${d.label}</span><b>${scoreNow?scoreNow.toFixed(1):'—'}</b></div>`;
+    d.qs.forEach((qObj,qi) => {
+      const qDiv = document.createElement('div');
+      qDiv.innerHTML = `<div class="q">${qObj.q}</div>`;
+      const optsDiv = document.createElement('div');
+      optsDiv.className = 'opts';
+      qObj.opts.forEach(([text,val]) => {
+        const checked = state.answers[d.key][qi] === val;
+        const lab = document.createElement('label');
+        lab.className = 'opt' + (checked?' checked':'');
+        lab.innerHTML = `<input type="radio" name="${d.key}-${qi}" ${checked?'checked':''}/> <span>${text}</span>`;
+        lab.querySelector('input').addEventListener('change', () => {
+          state.answers[d.key][qi] = val;
+          renderQuestions(); drawRadar(); computeOutputs(); renderStepper();
+        });
+        optsDiv.appendChild(lab);
+      });
+      qDiv.appendChild(optsDiv);
+      dimDiv.appendChild(qDiv);
+    });
+    box.appendChild(dimDiv);
+  });
+}
+function dimScore(key){
+  const a = state.answers[key];
+  if(a[0]===null || a[1]===null) return null;
+  return (a[0]+a[1])/2;
+}
+function pointAt(i,n,r,cx,cy){
+  const angle = (Math.PI*2*i/n) - Math.PI/2;
+  return [(cx+r*Math.cos(angle)).toFixed(1), (cy+r*Math.sin(angle)).toFixed(1)];
+}
+function drawRadar(){
+  const svg = document.getElementById('radar');
+  const cx=140, cy=140, R=95, n=dims.length;
+  let rings='';
+  [1,2,3,4,5].forEach(l => { const pts = dims.map((d,i)=>pointAt(i,n,l/5*R,cx,cy)).map(p=>p.join(',')).join(' '); rings += `<polygon points="${pts}" fill="none" stroke="#E4DBCA" stroke-width="1"/>`; });
+  let axes='', labels='';
+  dims.forEach((d,i) => {
+    const p = pointAt(i,n,R,cx,cy);
+    axes += `<line x1="${cx}" y1="${cy}" x2="${p[0]}" y2="${p[1]}" stroke="#E4DBCA" stroke-width="1"/>`;
+    const lp = pointAt(i,n,R+24,cx,cy);
+    labels += `<text x="${lp[0]}" y="${lp[1]}" font-family="IBM Plex Mono" font-size="9" fill="#6B6255" text-anchor="middle" dominant-baseline="middle">${d.label.split(' ')[0]}</text>`;
+  });
+  let dataPts = dims.map((d,i) => { const s = dimScore(d.key)||0; return pointAt(i,n,s/5*R,cx,cy); });
+  let shape='';
+  if(dataPts.length){ const pts = dataPts.map(p=>p.join(',')).join(' '); shape = `<polygon points="${pts}" fill="#C1613B" fill-opacity="0.28" stroke="#C1613B" stroke-width="2"/>`; dataPts.forEach(p=>{shape+=`<circle cx="${p[0]}" cy="${p[1]}" r="3" fill="#C1613B"/>`;}); }
+  svg.innerHTML = rings+axes+shape+labels;
+}
+function computeOutputs(){
+  const scores = dims.map(d => ({key:d.key,label:d.label,score:dimScore(d.key)}));
+  const answered = scores.filter(s=>s.score!==null);
+  const overallEl = document.getElementById('overallScore');
+  const bandEl = document.getElementById('bandLabel');
+  const flagBox = document.getElementById('flagBox');
+  const planBox = document.getElementById('planBox');
+  if(answered.length < dims.length){
+    overallEl.textContent='–'; bandEl.textContent='Awaiting input'; bandEl.className='band';
+    flagBox.innerHTML = '<div class="flag none">Answer all six dimensions to generate the plan.</div>';
+    planBox.innerHTML = '<div class="empty">Complete the Readiness stage to generate a plan.</div>';
+    return;
+  }
+  const overall = answered.reduce((a,s)=>a+s.score,0)/answered.length;
+  overallEl.textContent = overall.toFixed(1);
+  let bandClass,bandText;
+  if(overall<2.5){bandClass='foundation';bandText='Foundation first';}
+  else if(overall<3.5){bandClass='pilot';bandText='Pilot first';}
+  else {bandClass='fasttrack';bandText='Fast track';}
+  bandEl.textContent = bandText; bandEl.className = 'band '+bandClass;
+  const weak = sortWeak(answered.filter(s=>s.score<2.5));
+  flagBox.innerHTML = weak.length===0
+    ? '<div class="flag none">No single dimension is critically weak. Proceed on the overall band.</div>'
+    : weak.map(w=>`<div class="flag"><b>${w.label}</b> scored ${w.score.toFixed(1)}/5 — likely the constraint that stalls adoption if not addressed directly.</div>`).join('');
+  planBox.innerHTML = buildPlan(overall, weak);
+}
+const mitigations = {
+  data: 'Data readiness is the binding constraint here, not the model. Run a focused data-cleanup and ownership-assignment sprint before expanding access, per standard data quality practice: completeness and consistency gaps compound once more users depend on the output.',
+  process: 'Process fit is the binding constraint. Standardize and document the target workflow first through a rapid process-mapping exercise. Automating an undefined process usually just automates the inconsistency faster.',
+  sponsor: 'Executive sponsorship is the binding constraint. Secure a named, funded owner with authority to remove blockers before broader rollout. Change models consistently place a guiding coalition before momentum, not after.',
+  change: 'Change appetite is the binding constraint here, not the tooling. Prioritize frontline involvement and a visible early win over additional technical polish.',
+  tech: 'Tech stack maturity is the binding constraint. Run an integration spike and stand up basic production monitoring before expanding scope. Undetected model drift is a common silent failure mode once monitoring is skipped.',
+  risk: 'Risk tolerance is the binding constraint. Add a human-in-the-loop review step and narrow the initial exposure surface until the stakes of the use case and the org\'s risk appetite are back in alignment.'
+};
+
+const exitCriteria = {
+  data: 'the data feeding this use case is centralized and has a named owner, not just cleaned up once',
+  process: 'the target workflow has a single documented version that most people actually follow, not just a diagram nobody uses',
+  sponsor: 'a named owner has approved budget and can unblock decisions without escalating every time',
+  change: 'frontline usage holds without a champion having to prompt people, not just when leadership signs off',
+  tech: 'the integration runs without manual workarounds and someone is actually reviewing the monitoring, not just collecting it',
+  risk: 'a human reviewer has signed off on a stretch of outputs without needing to override or correct them'
+};
+
+function buildPlan(overall, weak){
+  let phases, bandKey;
+  if(overall<2.5){
+    bandKey = 'foundation';
+    phases = [
+      ['1','Foundation Fixes','Fix the weakest 1–2 dimensions before any pilot.', 'a re-assessment across all six dimensions shows the org is no longer scoring in the foundation-first band'],
+      ['2','Pilot','Single team, single workflow, tight success criteria tied to the fixed constraint.', null],
+      ['3','Scale Decision','Go/no-go based on pilot data, not enthusiasm.', null]
+    ];
+  } else if(overall<3.5){
+    bandKey = 'pilot';
+    const hasFlag = weak.length > 0;
+    phases = [
+      ['1','Pilot', hasFlag ? 'One team, real workflow, scoped narrowly around the flagged constraint.' : 'One team, real workflow, with clear success criteria defined upfront.', 'the pilot team is using the tool as the default, not a backup, and sending its output without a full manual rewrite'],
+      ['2','Adoption Sprint', hasFlag ? 'Address the flagged dimension head-on before wider rollout.' : 'No single dimension is holding this back. Use the pilot to build a concrete case for expansion rather than to fix something specific.', null],
+      ['3','Phased Expansion','Roll out team by team using pilot data as the credibility bridge.', null]
+    ];
+  } else {
+    bandKey = 'fasttrack';
+    phases = [
+      ['1','Fast Pilot','Move quickly, org fundamentals support it.', 'early usage confirms the fundamentals hold in practice, not just on paper'],
+      ['2','Broad Rollout','Expand with lightweight guardrails.', null],
+      ['3','Value Capture','Shift focus to adoption metrics and expansion.', null]
+    ];
+  }
+
+  const genericPhase2Exit = {
+    foundation: 'a re-assessment across all six dimensions shows the org is no longer scoring in the foundation-first band',
+    pilot: 'the pilot has produced a usage pattern you would be comfortable expanding without additional fixes',
+    fasttrack: 'initial usage data confirms the fast start is holding, not just the launch enthusiasm'
+  };
+
+  if(weak.length > 0){
+    const weakest = weak[0]; // lowest-scoring flagged dimension
+    phases[1][2] = mitigations[weakest.key];
+    phases[1][3] = exitCriteria[weakest.key];
+    if(weak.length > 1){
+      const others = weak.slice(1).map(w=>w.label).join(', ');
+      phases[1][2] += ` Also keep an eye on ${others}, currently flagged as compounding constraints, even though ${weakest.label} is the one to fix first.`;
+    }
+  } else {
+    // No dimension is critically weak: still give Phase 2 an earned, non-generic exit line
+    // rather than leaving it blank or inventing a dimension-specific claim that isn't true here.
+    phases[1][3] = genericPhase2Exit[bandKey];
+  }
+
+  const ice = getIceBand();
+  if(ice && ice.cls === 'foundation'){
+    // Decision gate, not a phase with a next step to earn, so no exit criteria here by design.
+    phases.unshift(['0','Re-Validate Scope','This use case scored low on impact, confidence, or ease at the Discovery stage, independent of how ready the org turned out to be. Confirm it\'s worth the investment before running the phases below.', null]);
+  }
+
+  return phases.map(([n,title,body,exit]) =>
+    `<div class="phase"><div class="phase-mark">${n}</div><div class="phase-body"><b>${title}</b><p>${body}</p>${exit ? `<p class="exit-criteria"><b>Move to next phase when:</b> ${exit}.</p>` : ''}</div></div>`
+  ).join('');
+}
+
+const momentumKeys = ['sponsor','change']; // durable organizational will, not fixable in a sprint
+const ceilingKeys = ['risk']; // a genuine policy-level cap, not an operational defect
+
+function getAdoptionConstraints(){
+  // Scoped deliberately to just the dimensions this stage's math actually uses.
+  // Data Readiness, Tech Stack Maturity, and Process Fit are correctable pre-launch
+  // fixes handled upstream in the Rollout Plan, so they don't drive Adoption's shape,
+  // and flagging one of them here would contradict Plan's own premise that they get fixed.
+  const relevant = [...momentumKeys, ...ceilingKeys];
+  const scores = relevant.map(k => ({key:k, label: dims.find(d=>d.key===k).label, score: dimScore(k)}));
+  return sortWeak(scores.filter(s=>s.score<2.5));
+}
+
+function avgOf(keys){ return keys.reduce((a,k)=>a+dimScore(k),0)/keys.length; }
+
+function bandFor(avg, type){
+  if(type==='momentum'){
+    if(avg<2.5) return {label:'Slow build', cls:'foundation'};
+    if(avg<3.5) return {label:'Steady climb', cls:'pilot'};
+    return {label:'Fast ramp', cls:'fasttrack'};
+  } else {
+    if(avg<2.5) return {label:'Capped early', cls:'foundation'};
+    if(avg<3.5) return {label:'Room to scale', cls:'pilot'};
+    return {label:'Full scale potential', cls:'fasttrack'};
+  }
+}
+
+function scopeLabel(){
+  const s = state.discovery.scope;
+  if(s==='team') return 'this team';
+  if(s==='department') return 'this department';
+  if(s==='orgwide') return 'the organization';
+  return 'the intended group';
+}
+
+function renderAdoption(){
+  const body = document.getElementById('adoptionBody');
+  const answered = dims.every(d => dimScore(d.key)!==null);
+  if(!answered){
+    body.innerHTML = '<div class="empty">Complete Readiness and Rollout Plan first, or load the mock scenario, to see the adoption outlook.</div>';
+    return;
+  }
+  const momentumAvg = avgOf(momentumKeys);
+  const ceilingAvg = avgOf(ceilingKeys);
+  const momentumBand = bandFor(momentumAvg, 'momentum');
+  const ceilingBand = bandFor(ceilingAvg, 'ceiling');
+  const constraints = getAdoptionConstraints();
+  const weakest = constraints.length ? constraints[0] : null;
+  const scope = scopeLabel();
+
+  // Curve shape only, no numeric axis: two segments, rate/ceiling driven by the readiness
+  // averages above. If the binding constraint sits on the momentum side, the second segment
+  // uses an improved momentum average (as if that one dimension were addressed); if it sits
+  // on the ceiling side, the second segment raises the ceiling instead.
+  let improvedMomentumAvg = momentumAvg, improvedCeilingAvg = ceilingAvg;
+  let constraintSide = null;
+  if(weakest){
+    if(momentumKeys.includes(weakest.key)){
+      constraintSide = 'momentum';
+      const sum = momentumKeys.reduce((a,k)=> a + (k===weakest.key ? 4 : dimScore(k)), 0);
+      improvedMomentumAvg = sum/momentumKeys.length;
+    } else if(ceilingKeys.includes(weakest.key)){
+      constraintSide = 'ceiling';
+      const sum = ceilingKeys.reduce((a,k)=> a + (k===weakest.key ? 4 : dimScore(k)), 0);
+      improvedCeilingAvg = sum/ceilingKeys.length;
+    }
+  }
+  const rate = (avg) => 0.05 + ((avg-1)/4)*0.22;
+  const ceilFrac = (avg) => 0.30 + ((avg-1)/4)*0.55;
+  const steps = 9, markerStep = weakest ? 4 : null;
+  let curveRel = [], value = 0.02, curRate = rate(momentumAvg), curCeil = ceilFrac(ceilingAvg);
+  for(let t=1;t<=steps;t++){
+    if(markerStep && t>=markerStep){
+      curRate = rate(improvedMomentumAvg);
+      curCeil = ceilFrac(improvedCeilingAvg);
+    }
+    value = value + curRate*(curCeil - value);
+    curveRel.push(value);
+  }
+
+  const w=680,h=180,pad=24;
+  let path = curveRel.map((v,i) => {
+    const x = pad + (i/(steps-1))*(w-2*pad);
+    const y = (h-pad) - v*(h-2*pad);
+    return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  let markerMark = '';
+  if(markerStep){
+    const x = pad + ((markerStep-1)/(steps-1))*(w-2*pad);
+    markerMark = `<line x1="${x}" y1="${pad}" x2="${x}" y2="${h-pad}" stroke="#C9A227" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="${x}" y="${pad-6}" font-family="IBM Plex Mono" font-size="9" fill="#8A6D14" text-anchor="middle">after addressing ${weakest.label.split(' ')[0]}</text>`;
+  }
+
+  const constraintText = weakest
+    ? `<b>${weakest.label}</b> is the binding constraint, and it's ${constraintSide==='momentum' ? 'a momentum drag: it slows how fast adoption builds within ' + scope + ', not how far it can ultimately reach.' : 'a ceiling cap: it limits how far adoption can go within ' + scope + ', independent of how quickly people are willing to start.'}${constraints.length > 1 ? ` Also worth watching: ${constraints.slice(1).map(c=>c.label).join(', ')}, currently flagged as well, even though ${weakest.label} is the one shaping this curve.` : ''}`
+    : `No single dimension is critically weak, so momentum and ceiling within ${scope} both reflect a broadly healthy readiness profile.`;
+
+  body.innerHTML = `
+    <div class="model-badge"><b>Qualitative projection, not measured data</b>. Shape reflects readiness scores, not a forecasted number.</div>
+    <div class="kpi-grid" style="grid-template-columns:1fr 1fr;">
+      <div class="kpi"><div class="val" style="font-size:19px;">${momentumBand.label}</div><div class="lab">Momentum, within ${scope}</div></div>
+      <div class="kpi"><div class="val" style="font-size:19px;">${ceilingBand.label}</div><div class="lab">Ceiling, within ${scope}</div></div>
+    </div>
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+      <line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#E4DBCA"/>
+      <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" stroke="#E4DBCA"/>
+      ${markerMark}
+      <path d="${path}" fill="none" stroke="#C1613B" stroke-width="2.5"/>
+    </svg>
+    <div class="callout">${constraintText}</div>
+    <div class="callout" style="margin-top:10px; background:#FBF7EF; border-left-color:var(--line);"><b>How this is generated:</b> Executive Sponsorship and Change Appetite determine momentum, how fast adoption builds within ${scope}, since neither can be manufactured by a sprint, they reflect genuine organizational will. Risk Tolerance alone sets the ceiling, a real policy-level cap on exposure, not an operational defect. Data Readiness, Tech Stack Maturity, and Process Fit are intentionally left out of this stage: they're correctable pre-launch fixes already handled in the Rollout Plan, so treating them as a lingering limit here would contradict that plan's own premise. The shape shown is relative, not a forecast of a specific percentage or date.</div>
+  `;
+}
+
+function getWeakestFlag(){
+  const scores = dims.map(d => ({key:d.key, label:d.label, score:dimScore(d.key)})).filter(s=>s.score!==null);
+  const weak = scores.filter(s=>s.score<2.5).sort((a,b)=>a.score-b.score);
+  return weak.length ? weak[0] : null;
+}
+function loadMock(){
+  state.discovery = {...mock.discovery};
+  state.ice = {...mock.ice};
+  Object.keys(mock.answers).forEach(k => state.answers[k] = [...mock.answers[k]]);
+  fillDiscoveryFields();
+  const banner = document.getElementById('scenarioBanner');
+  banner.className = 'scenario-banner show';
+  banner.innerHTML = `<b>Mock scenario: Larkspur Group</b> — a 1,200-person professional services firm piloting an AI proposal-drafting assistant. Strong sponsorship and workable data access, but two prior tool rollouts landed badly with practice leads. Change appetite, not the technology, is the dimension that determines whether this works. Walk through all four stages to see how that single flag shapes the rollout plan and the modeled adoption curve.`;
+  goTo('discovery');
+}
+function resetAll(){
+  state = { discovery:{name:'',problem:'',process:'',metric:'',scope:null}, ice:{impact:null,confidence:null,ease:null}, answers:{} };
+  dims.forEach(d => state.answers[d.key] = [null,null]);
+  document.getElementById('scenarioBanner').className = 'scenario-banner';
+  fillDiscoveryFields();
+  goTo('discovery');
+}
+
+renderStepper();
+fillDiscoveryFields();
+goTo('discovery');
+</script>
+</body>
+</html>
